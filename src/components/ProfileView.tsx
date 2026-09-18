@@ -9,7 +9,13 @@ export default function ProfileView({ user, onLogout, onUserUpdate }: { user: an
   const [formData, setFormData] = useState({
     name: user?.displayName || '',
     storeName: '',
-    upiId: ''
+    upiId: '',
+    storeAddress: '',
+    accountNo: '',
+    ifscCode: '',
+    branch: '',
+    gstNo: '',
+    storeEmail: ''
   });
 
   useEffect(() => {
@@ -29,7 +35,13 @@ export default function ProfileView({ user, onLogout, onUserUpdate }: { user: an
           setFormData({
             name: data.name || user?.displayName || '',
             storeName: data.storeName || '',
-            upiId: data.upiId || ''
+            upiId: data.upiId || '',
+            storeAddress: data.storeAddress || '',
+            accountNo: data.accountNo || '',
+            ifscCode: data.ifscCode || '',
+            branch: data.branch || '',
+            gstNo: data.gstNo || '',
+            storeEmail: data.storeEmail || ''
           });
         }
       } catch (error) {
@@ -56,6 +68,12 @@ export default function ProfileView({ user, onLogout, onUserUpdate }: { user: an
         name: formData.name,
         storeName: formData.storeName,
         upiId: formData.upiId,
+        storeAddress: formData.storeAddress,
+        accountNo: formData.accountNo,
+        ifscCode: formData.ifscCode,
+        branch: formData.branch,
+        gstNo: formData.gstNo,
+        storeEmail: formData.storeEmail,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
@@ -138,8 +156,75 @@ export default function ProfileView({ user, onLogout, onUserUpdate }: { user: an
               value={formData.storeName}
               onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700"
-              placeholder="e.g. Acme Supermart"
-              required
+              placeholder="e.g. M/s Raj Kitchenware"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Shop Address</label>
+            <input
+              type="text"
+              value={formData.storeAddress}
+              onChange={(e) => setFormData({ ...formData, storeAddress: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700"
+              placeholder="e.g. Hatigachhi, Supaul Bazar"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bank Account No.</label>
+              <input
+                type="text"
+                value={formData.accountNo}
+                onChange={(e) => setFormData({ ...formData, accountNo: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700"
+                placeholder="e.g. 38419623784"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">IFSC Code</label>
+              <input
+                type="text"
+                value={formData.ifscCode}
+                onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700"
+                placeholder="e.g. SBIN0017827"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bank Branch</label>
+              <input
+                type="text"
+                value={formData.branch}
+                onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700"
+                placeholder="e.g. Nan Bhagwan"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">GST No.</label>
+              <input
+                type="text"
+                value={formData.gstNo}
+                onChange={(e) => setFormData({ ...formData, gstNo: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700"
+                placeholder="e.g. 10ANSPJ4800F1ZG"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Shop Email</label>
+            <input
+              type="email"
+              value={formData.storeEmail}
+              onChange={(e) => setFormData({ ...formData, storeEmail: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700"
+              placeholder="e.g. raj_jha5555@gmail.com"
             />
           </div>
 
@@ -151,7 +236,6 @@ export default function ProfileView({ user, onLogout, onUserUpdate }: { user: an
               onChange={(e) => setFormData({ ...formData, upiId: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700"
               placeholder="e.g. merchant@upi"
-              required
             />
             <p className="text-sm text-gray-500 mt-1">
               Payments from generated QR codes will be sent to this UPI ID.

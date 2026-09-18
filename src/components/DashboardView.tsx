@@ -1,89 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, getDocs, addDoc, doc, getDoc, onSnapshot, updateDoc, setDoc, db } from '../lib/db';
-import { Package, Users, FileText, ShoppingCart, Plus, Trash2, X, MessageSquare, Mail, ExternalLink, Send, Download } from 'lucide-react';
+import { Package, Users, FileText, ShoppingCart, Plus, Trash2, X, MessageSquare, Mail, ExternalLink, Send, Download, Eye, Printer } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion } from 'motion/react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { generateInvoiceHTML } from '../lib/invoiceTemplate';
+import InvoicePreviewModal from './InvoicePreviewModal';
 
-export const printInvoiceLocally = (invoiceData: any) => {
+export const printInvoiceLocally = (invoiceData: any, shopProfile?: any) => {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     alert("Popup blocked! Please allow popups to print.");
     return;
   }
   
-  const dateStr = new Date(invoiceData.createdAt || Date.now()).toLocaleDateString();
-  const totalAmount = Number(invoiceData.total || 0).toFixed(2);
-  const customerDetails = invoiceData.paymentDetails?.customerDetails;
-  
-  const itemsHtml = (invoiceData.items || []).map((item: any) => `
-    <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #eee;">${item.name}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #eee;">${item.quantity}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #eee;">$${Number(item.price).toFixed(2)}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #eee;">$${Number(item.price * item.quantity).toFixed(2)}</td>
-    </tr>
-  `).join('');
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Invoice ${invoiceData.invoiceIdStr}</title>
-      <style>
-        body { font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #333; }
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #eee; padding-bottom: 20px; }
-        .details { margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        th { background: #f9f9f9; }
-        .total { text-align: right; margin-top: 20px; font-size: 1.2em; font-weight: bold; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div>
-          <h1 style="margin: 0; font-size: 2.2em; font-weight: 800; text-transform: uppercase;">INVOICE</h1>
-          <p>Invoice #: ${invoiceData.invoiceIdStr}</p>
-          <p>Date: ${dateStr}</p>
-          <p>Status: ${invoiceData.status}</p>
-        </div>
-      </div>
-      
-      <div class="details">
-        <h3>Customer Details</h3>
-        ${customerDetails ? `
-          <p>Name: ${customerDetails.name || 'N/A'}</p>
-          <p>Email: ${customerDetails.email || 'N/A'}</p>
-          <p>Phone: ${customerDetails.phone || 'N/A'}</p>
-        ` : '<p>No customer details available</p>'}
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Quantity</th>
-            <th>Price</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsHtml}
-        </tbody>
-      </table>
-
-      <div class="total">
-        Total Amount: $${totalAmount}
-      </div>
-      
-      ${invoiceData.paymentDetails?.utr ? `
-      <div style="margin-top: 40px; font-size: 0.9em; color: #666;">
-        Payment UTR: ${invoiceData.paymentDetails.utr}
-      </div>` : ''}
-    </body>
-    </html>
-  `;
+  const html = generateInvoiceHTML(invoiceData, shopProfile);
   
   printWindow.document.write(html);
   printWindow.document.close();
@@ -110,6 +41,7 @@ export default function DashboardView({ user }: { user: any }) {
   const [customerEmail, setCustomerEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [staffProfile, setStaffProfile] = useState<any>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<any>(null);
   
   // Manual Item Entry State
   const [manualItemName, setManualItemName] = useState('');
@@ -861,17 +793,24 @@ export default function DashboardView({ user }: { user: any }) {
                         )}
                         <div className="flex flex-wrap gap-3">
                           <button
+                            onClick={() => setPreviewInvoice(inv)}
+                            className="text-indigo-600 hover:text-indigo-800 font-medium text-xs flex items-center gap-1"
+                            title="Preview Traditional Indian Invoice"
+                          >
+                            <Eye className="w-3 h-3" /> Preview
+                          </button>
+                          <button
                             onClick={() => {
                               if (import.meta.env.VITE_USE_REAL_FIREBASE !== 'true') {
-                                printInvoiceLocally(inv);
+                                printInvoiceLocally(inv, staffProfile);
                               } else {
                                 window.open(`/api/invoice/${inv.invoiceIdStr}/download`, '_blank');
                               }
                             }}
-                            className="text-indigo-600 hover:text-indigo-800 font-medium text-xs flex items-center gap-1"
-                            title="Download PDF"
+                            className="text-black hover:text-gray-600 font-medium text-xs flex items-center gap-1"
+                            title="Print / Download PDF"
                           >
-                            <Download className="w-3 h-3" /> PDF
+                            <Printer className="w-3 h-3" /> Print/PDF
                           </button>
                           {inv.invoiceUrl && (
                             <>
@@ -999,6 +938,15 @@ export default function DashboardView({ user }: { user: any }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invoice Preview Modal */}
+      {previewInvoice && (
+        <InvoicePreviewModal
+          invoice={previewInvoice}
+          shopProfile={staffProfile}
+          onClose={() => setPreviewInvoice(null)}
+        />
       )}
     </motion.div>
   );

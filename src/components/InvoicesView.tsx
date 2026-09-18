@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, db } from '../lib/db';
-import { Plus, Edit2, Trash2, X, Download, Search, MessageSquare, Mail, ExternalLink, Filter, Send } from 'lucide-react';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, db } from '../lib/db';
+import { Plus, Edit2, Trash2, X, Download, Search, MessageSquare, Mail, ExternalLink, Filter, Send, Eye, Printer } from 'lucide-react';
 import { motion } from 'motion/react';
 import { printInvoiceLocally } from './DashboardView';
+import InvoicePreviewModal from './InvoicePreviewModal';
 
 export default function InvoicesView({ user }: { user: any }) {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -10,6 +11,8 @@ export default function InvoicesView({ user }: { user: any }) {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [previewInvoice, setPreviewInvoice] = useState<any>(null);
+  const [shopProfile, setShopProfile] = useState<any>(null);
 
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,10 +33,11 @@ export default function InvoicesView({ user }: { user: any }) {
       const customersQ = query(collection(db, "customers"), where("userId", "==", user.uid));
       const productsQ = query(collection(db, "products"), where("userId", "==", user.uid));
 
-      const [invSnap, custSnap, prodSnap] = await Promise.all([
+      const [invSnap, custSnap, prodSnap, userSnap] = await Promise.all([
         getDocs(invoicesQ),
         getDocs(customersQ),
-        getDocs(productsQ)
+        getDocs(productsQ),
+        getDoc(doc(db, "users", user.uid))
       ]);
 
       const invList = invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -43,6 +47,9 @@ export default function InvoicesView({ user }: { user: any }) {
       setInvoices(invList);
       setCustomers(custList);
       setProducts(prodList);
+      if (userSnap.exists()) {
+        setShopProfile(userSnap.data());
+      }
     } catch (e) {
       console.error("Error fetching data", e);
     } finally {
@@ -369,9 +376,16 @@ export default function InvoicesView({ user }: { user: any }) {
                       </button>
                     )}
                     <button
+                      onClick={() => setPreviewInvoice(invoice)}
+                      className="text-indigo-600 hover:text-indigo-800 font-medium text-xs flex items-center gap-1"
+                      title="Preview Traditional Indian Invoice"
+                    >
+                      <Eye className="w-4 h-4" /> Preview
+                    </button>
+                    <button
                       onClick={() => {
                         if (import.meta.env.VITE_USE_REAL_FIREBASE !== 'true') {
-                          printInvoiceLocally(invoice);
+                          printInvoiceLocally(invoice, shopProfile);
                         } else {
                           window.open(`/api/invoice/${invoice.invoiceIdStr}/download`, '_blank');
                         }
@@ -379,7 +393,7 @@ export default function InvoicesView({ user }: { user: any }) {
                       className="text-black hover:text-gray-600 font-medium text-xs flex items-center gap-1 pr-2 border-r border-black/10"
                       title="Download PDF"
                     >
-                      <Download className="w-4 h-4" /> PDF
+                      <Printer className="w-4 h-4" /> Print/PDF
                     </button>
                     {invoice.invoiceUrl && (
                       <>
@@ -596,6 +610,15 @@ export default function InvoicesView({ user }: { user: any }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* INVOICE PREVIEW MODAL */}
+      {previewInvoice && (
+        <InvoicePreviewModal
+          invoice={previewInvoice}
+          shopProfile={shopProfile}
+          onClose={() => setPreviewInvoice(null)}
+        />
       )}
     </motion.div>
   );

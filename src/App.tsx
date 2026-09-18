@@ -1,27 +1,78 @@
 import { useState, useEffect } from 'react';
 import { LogOut, LayoutDashboard, Package, Users, FileText, UserCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import AnimatedIllustration from './components/AnimatedIllustration';
 import DashboardView from './components/DashboardView';
 import ProductsView from './components/ProductsView';
 import CustomersView from './components/CustomersView';
 import InvoicesView from './components/InvoicesView';
 import ProfileView from './components/ProfileView';
+import AuthScreen from './components/AuthScreen';
 import { doc, onSnapshot, db } from './lib/db';
+import { subscribeToAuthChanges, logoutUser } from './lib/auth';
 
 export default function App() {
-  const [user, setUser] = useState<any>({
-    uid: 'dev-user-123',
-    email: 'developer@creatiwise.local',
-    displayName: 'Guest Developer',
-    photoURL: 'https://api.dicebear.com/7.x/bottts/svg?seed=developer'
-  });
+  const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const login = async () => {};
-  const loginAnonymously = async () => {};
-  const logout = async () => {};
+  useEffect(() => {
+    // Check initial local guest session if present
+    const localGuest = localStorage.getItem('local_guest_session');
+    if (localGuest) {
+      try {
+        setUser(JSON.parse(localGuest));
+        setLoading(false);
+      } catch (e) {}
+    }
+
+    const handleGuestEvent = () => {
+      const stored = localStorage.getItem('local_guest_session');
+      if (stored) {
+        try {
+          setUser(JSON.parse(stored));
+          setLoading(false);
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('guest_login_event', handleGuestEvent);
+
+    const unsubscribeAuth = subscribeToAuthChanges((firebaseUser) => {
+      if (firebaseUser) {
+        localStorage.removeItem('local_guest_session');
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || 'guest@local.dev',
+          displayName: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Guest User' : 'Shop Owner'),
+          photoURL: firebaseUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${firebaseUser.uid}`,
+          isAnonymous: firebaseUser.isAnonymous
+        });
+      } else {
+        const savedGuest = localStorage.getItem('local_guest_session');
+        if (savedGuest) {
+          try {
+            setUser(JSON.parse(savedGuest));
+          } catch (e) {
+            setUser(null);
+          }
+        } else if (import.meta.env.VITE_USE_REAL_FIREBASE !== 'true') {
+          setUser({
+            uid: 'dev-user-123',
+            email: 'developer@creatiwise.local',
+            displayName: 'Guest Developer',
+            photoURL: 'https://api.dicebear.com/7.x/bottts/svg?seed=developer'
+          });
+        } else {
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribeAuth();
+      window.removeEventListener('guest_login_event', handleGuestEvent);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -31,72 +82,36 @@ export default function App() {
         const data = docSnap.data();
         setUser((prevUser: any) => ({
           ...prevUser,
-          displayName: data.name || prevUser.displayName,
-          email: data.email || prevUser.email || 'developer@creatiwise.local'
+          displayName: data.name || data.storeName || prevUser?.displayName || 'Shop Owner',
+          email: data.storeEmail || data.email || prevUser?.email || 'user@local.dev'
         }));
       }
     });
     return () => unsubscribe();
   }, [user?.uid]);
 
+  const handleLogout = async () => {
+    try {
+      localStorage.removeItem('local_guest_session');
+      await logoutUser();
+      setUser(null);
+    } catch (e) {
+      console.error("Logout failed", e);
+      localStorage.removeItem('local_guest_session');
+      setUser(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-gray-500 font-medium">Initializing Authentication...</p>
       </div>
     );
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
-        {/* Decorative Doodles */}
-        <div className="absolute top-[10%] left-[15%] opacity-20 pointer-events-none w-32 h-32 hidden md:block">
-          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M100 0L105 85L190 90L105 95L100 180L95 95L10 90L95 85L100 0Z" fill="black"/></svg>
-        </div>
-        <div className="absolute bottom-[15%] right-[10%] opacity-20 pointer-events-none w-24 h-24 hidden md:block">
-           <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 100 Q 50 0, 100 100 T 200 100" stroke="black" strokeWidth="10" fill="none"/></svg>
-        </div>
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-10 rounded-[40px] border-2 border-black max-w-sm w-full text-center relative z-10 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
-        >
-          <div className="mb-8 mt-2">
-            <h1 className="text-4xl font-bold text-black tracking-tight mb-3 font-display uppercase">Invoicer</h1>
-            <p className="text-gray-600 text-sm leading-relaxed max-w-[250px] mx-auto">Create beautiful invoices, manage your clients and track products seamlessly.</p>
-          </div>
-          
-          <button 
-            onClick={login} 
-            className="w-full bg-black text-white px-5 py-4 rounded-full font-bold hover:bg-gray-800 active:scale-[0.98] transition-all flex items-center justify-center gap-3 relative group overflow-hidden"
-          >
-            <motion.div 
-               className="absolute inset-0 bg-white/10 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" 
-            />
-            <svg className="w-5 h-5 relative z-10 bg-white rounded-full p-1" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            <span className="relative z-10 group-hover:tracking-wide transition-all duration-300">Sign in with Google</span>
-          </button>
-
-          <button 
-            onClick={loginAnonymously} 
-            className="w-full mt-3 bg-white text-black border-2 border-black px-5 py-4 rounded-full font-bold hover:bg-gray-50 active:scale-[0.98] transition-all flex items-center justify-center gap-3 relative group overflow-hidden"
-          >
-            <motion.div 
-               className="absolute inset-0 bg-black/5 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" 
-            />
-            <UserCircle className="w-5 h-5 relative z-10 text-black" />
-            <span className="relative z-10 group-hover:tracking-wide transition-all duration-300">Continue as Guest</span>
-          </button>
-        </motion.div>
-      </div>
-    );
+    return <AuthScreen />;
   }
 
   const renderContent = () => {
@@ -105,7 +120,7 @@ export default function App() {
       case 'products': return <ProductsView user={user} />;
       case 'customers': return <CustomersView user={user} />;
       case 'invoices': return <InvoicesView user={user} />;
-      case 'profile': return <ProfileView user={user} onUserUpdate={(newUser) => setUser(newUser)} />;
+      case 'profile': return <ProfileView user={user} onLogout={handleLogout} onUserUpdate={(newUser) => setUser(newUser)} />;
       default: return <DashboardView user={user} />;
     }
   };
@@ -167,7 +182,7 @@ export default function App() {
 
         {/* User Card & Logout */}
         <div className="p-6 border-t border-black/10">
-          <div className="flex items-center mb-6 px-2">
+          <div className="flex items-center mb-4 px-2">
             {user.photoURL ? (
               <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full bg-gray-100" referrerPolicy="no-referrer" />
             ) : (
@@ -176,11 +191,18 @@ export default function App() {
               </div>
             )}
             <div className="ml-3 overflow-hidden">
-              <p className="text-sm font-bold text-black truncate">{user.displayName || 'Guest Developer'}</p>
-              <p className="text-xs text-gray-500 truncate">{user.email || 'guest@local.dev'}</p>
+              <p className="text-sm font-bold text-black truncate">{user.displayName || 'Shop Owner'}</p>
+              <p className="text-xs text-gray-500 truncate">{user.email || 'user@local.dev'}</p>
             </div>
           </div>
 
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center space-x-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700 py-2.5 rounded-xl text-xs font-bold transition"
+          >
+            <LogOut size={16} />
+            <span>Sign Out</span>
+          </button>
         </div>
       </aside>
 

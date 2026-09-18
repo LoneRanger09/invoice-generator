@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth, type AuthRequest } from "../middleware/auth.ts";
+import { generateInvoiceHTML } from "./invoiceTemplate";
 
 function simulateDeliveryProvider(docRef: any, contactDetails: any) {
   setTimeout(async () => {
@@ -395,76 +396,9 @@ app.get("/api/invoice/:invoiceId/download", async (req, res) => {
 
     const invoiceData = querySnapshot.docs[0].data();
     
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Invoice ${invoiceId}</title>
-      <style>
-        body { font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #333; }
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #eee; padding-bottom: 20px; }
-        .details { margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        th { background: #f9f9f9; }
-        .total { text-align: right; margin-top: 20px; font-size: 1.2em; font-weight: bold; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div>
-          <h1>INVOICE</h1>
-          <p>Invoice #: ${invoiceId}</p>
-          <p>Date: ${new Date(invoiceData.createdAt || Date.now()).toLocaleDateString()}</p>
-          <p>Status: ${invoiceData.status}</p>
-        </div>
-      </div>
-      
-      <div class="details">
-        <h3>Customer Details</h3>
-        ${invoiceData.paymentDetails?.customerDetails ? `
-          <p>Name: ${invoiceData.paymentDetails.customerDetails.name || 'N/A'}</p>
-          <p>Email: ${invoiceData.paymentDetails.customerDetails.email || 'N/A'}</p>
-          <p>Phone: ${invoiceData.paymentDetails.customerDetails.phone || 'N/A'}</p>
-        ` : '<p>No customer details available</p>'}
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Quantity</th>
-            <th>Price</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${(invoiceData.items || []).map((item: any) => `
-            <tr>
-              <td>${item.name}</td>
-              <td>${item.quantity}</td>
-              <td>$${Number(item.price).toFixed(2)}</td>
-              <td>$${Number(item.price * item.quantity).toFixed(2)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-
-      <div class="total">
-        Total Amount: $${Number(invoiceData.total || 0).toFixed(2)}
-      </div>
-      
-      ${invoiceData.paymentDetails?.utr ? `
-      <div style="margin-top: 40px; font-size: 0.9em; color: #666;">
-        Payment UTR: ${invoiceData.paymentDetails.utr}
-      </div>` : ''}
-
-      <script>
-        window.onload = function() { window.print(); }
-      </script>
-    </body>
-    </html>
-    `;
+    let html = generateInvoiceHTML(invoiceData);
+    // Append window.print() trigger
+    html = html.replace('</body>', '<script>window.onload = function() { window.print(); }</script></body>');
 
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
